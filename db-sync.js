@@ -18,13 +18,16 @@ const BATCH_SIZE = parseInt(process.env.BATCH_SIZE) || 1000; // Documents per ba
 
 // Specific collections to sync
 const COLLECTIONS_TO_SYNC = [
-  "contents",
-  "shows",
-  "episodes",
-  "raw-media",
-  "VisionularTranscoding",
-  "adminusers",
-  "cmsusers",
+  //   "contents",
+  //   "shows",
+  //   "episodes",
+  //   "raw-media",
+  //   "VisionularTranscoding",
+  //   "adminusers",
+  //   "cmsusers",
+  "dialects",
+  "usercultures",
+  //   "seasons",
 ];
 
 console.log("🔄 Database Sync Script started at:", new Date().toISOString());

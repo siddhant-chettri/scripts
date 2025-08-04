@@ -7,7 +7,7 @@ const execAsync = promisify(exec);
 require("dotenv").config();
 
 // Import schemas, models, and enums from the new organized structure
-const { RawMedia, Episode } = require("./models");
+const { RawMedia, Episode, VisonularTranscoding } = require("./models");
 
 const MONGO_URI = process.env.MONGO_URI;
 const MEDIA_VIDEO_URL = process.env.MEDIA_VIDEO_URL;
@@ -173,11 +173,13 @@ async function createRawMediaFromEpisode(episode) {
       `⚠️  Missing visionularHlsH265.visionularTaskId for episode ${episode.slug}`
     );
   }
-  const visionularHlsTaskId = await mongoose.connection.db
-    .collection("VisonularTransconding")
-    .findOne({
-      task_id: episode.visionularHls.visionularTaskId,
-    });
+
+  console.log(
+    `🔍 VisionularHlsTaskId: ${episode.visionularHls.visionularTaskId} for episode ${episode.slug}======>`
+  );
+  const visionularHlsTaskId = await VisonularTranscoding.findOne({
+    task_id: episode.visionularHls.visionularTaskId.toString(),
+  });
 
   if (!visionularHlsTaskId) {
     console.warn(
@@ -185,11 +187,9 @@ async function createRawMediaFromEpisode(episode) {
     );
   }
 
-  const visionularHlsH265TaskId = await mongoose.connection.db
-    .collection("VisonularTransconding")
-    .findOne({
-      task_id: episode.visionularHlsH265.visionularTaskId,
-    });
+  const visionularHlsH265TaskId = await VisonularTranscoding.findOne({
+    task_id: episode.visionularHlsH265.visionularTaskId,
+  });
 
   if (!visionularHlsH265TaskId) {
     console.warn(
@@ -210,13 +210,13 @@ async function createRawMediaFromEpisode(episode) {
         taskStatus: "completed", // Using enum value from TaskStatusEnum
         taskType: "video-transcoding", // Using enum value from TranscodingTaskTypeEnum
         transcodingEngine: "visionular", // Using enum value from TranscodingEngineEnum
-        // transcodingTaskId: visionularHlsTaskId?._id || "",
+        transcodingTaskId: visionularHlsTaskId._id,
       },
       {
         taskStatus: "completed", // Using enum value from TaskStatusEnum
         taskType: "video-transcoding", // Using enum value from TranscodingTaskTypeEnum
         transcodingEngine: "visionular", // Using enum value from TranscodingEngineEnum
-        // transcodingTaskId: visionularHlsH265TaskId?._id || "",
+        transcodingTaskId: visionularHlsH265TaskId._id,
       },
     ],
     uploadProgress: 100,
