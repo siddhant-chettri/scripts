@@ -109,11 +109,13 @@ const episodeSchema = mongoose.Schema(
       sourceLink: String,
       duration: Number,
       hlsSourceLink: String,
-      default: {},
+      rawMediaId: String,
     },
     visionularHlsH265: {
-      type: Object,
-      default: {},
+      sourceLink: String,
+      duration: Number,
+      hlsSourceLink: String,
+      rawMediaId: String,
     },
   },
   {

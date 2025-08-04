@@ -97,12 +97,14 @@ async function findActiveEpisodesWithMissingRawMediaId(
   try {
     const query = {
       status: "active",
+      displayLanguage: "en",
       $or: [
         { [`${transcodingType}.rawMediaId`]: { $exists: false } },
         { [`${transcodingType}.rawMediaId`]: "" },
         { [`${transcodingType}.rawMediaId`]: null },
       ],
-      [transcodingType]: { $exists: true }, // 3650 3651 these ids do not  have visonular objects
+      [transcodingType]: { $exists: true },
+      // 3650 3651 these ids do not  have visonular objects
     };
 
     console.log(`📋 Query being executed:`, JSON.stringify(query, null, 2));
@@ -162,12 +164,12 @@ async function createRawMediaFromEpisode(episode) {
   // Validate episode data before creating raw media
   console.log(`🔍 Validating episode data...`);
   if (!episode.visionularHls?.visionularTaskId) {
-    throw new Error(
+    console.warn(
       `⚠️  Missing visionularHls.visionularTaskId for episode ${episode.slug}`
     );
   }
   if (!episode.visionularHlsH265?.visionularTaskId) {
-    throw new Error(
+    console.warn(
       `⚠️  Missing visionularHlsH265.visionularTaskId for episode ${episode.slug}`
     );
   }
@@ -178,7 +180,7 @@ async function createRawMediaFromEpisode(episode) {
     });
 
   if (!visionularHlsTaskId) {
-    throw new Error(
+    console.warn(
       `⚠️  Missing visionularHls task id for episode ${episode.slug}`
     );
   }
@@ -190,7 +192,7 @@ async function createRawMediaFromEpisode(episode) {
     });
 
   if (!visionularHlsH265TaskId) {
-    throw new Error(
+    console.warn(
       `⚠️  Missing visionularHlsH265 task id for episode ${episode.slug}`
     );
   }
@@ -208,13 +210,13 @@ async function createRawMediaFromEpisode(episode) {
         taskStatus: "completed", // Using enum value from TaskStatusEnum
         taskType: "video-transcoding", // Using enum value from TranscodingTaskTypeEnum
         transcodingEngine: "visionular", // Using enum value from TranscodingEngineEnum
-        transcodingTaskId: visionularHlsTaskId._id,
+        // transcodingTaskId: visionularHlsTaskId?._id || "",
       },
       {
         taskStatus: "completed", // Using enum value from TaskStatusEnum
         taskType: "video-transcoding", // Using enum value from TranscodingTaskTypeEnum
         transcodingEngine: "visionular", // Using enum value from TranscodingEngineEnum
-        transcodingTaskId: visionularHlsH265TaskId._id,
+        // transcodingTaskId: visionularHlsH265TaskId?._id || "",
       },
     ],
     uploadProgress: 100,
@@ -253,23 +255,33 @@ async function createRawMediaFromEpisode(episode) {
   }
 }
 
-// Placeholder function - implement based on your business logic
-async function addRawMediaToEnAndHinEpisode({ rawMediaId, slug, type }) {
-  console.log(`🔗 Adding raw media ID to episode: ${slug} (${type})`);
+// Fixed function to update only the specific transcoding type
+async function addRawMediaToEnAndHinEpisode({
+  rawMediaId,
+  slug,
+  type,
+  transcodingType,
+  dialect,
+}) {
+  console.log(
+    `🔗 Adding raw media ID to episode: ${slug} (${type}) for ${transcodingType}`
+  );
   console.log(`🆔 Raw media ID: ${rawMediaId}`);
 
   try {
     const updateData = {
       $set: {
-        "visionularHls.rawMediaId": rawMediaId,
-        "visionularHlsH265.rawMediaId": rawMediaId,
+        [`${transcodingType}.rawMediaId`]: rawMediaId,
       },
     };
 
     console.log(`📋 Update data:`, JSON.stringify(updateData, null, 2));
 
     const startTime = Date.now();
-    const result = await Episode.updateOne({ slug, type }, updateData);
+    const result = await Episode.updateMany(
+      { slug, type, language: dialect },
+      updateData
+    );
     const updateTime = Date.now() - startTime;
 
     console.log(`⏱️  Update execution time: ${updateTime}ms`);
@@ -303,6 +315,15 @@ async function main() {
   const scriptStartTime = Date.now();
   console.log("🎯 Starting main execution...");
 
+  // Initialize separate counters for HLS and HLS265
+  let hlsEpisodesFound = 0;
+  let hlsRawMediaCreated = 0;
+  let hlsEpisodesUpdated = 0;
+
+  let hls265EpisodesFound = 0;
+  let hls265RawMediaCreated = 0;
+  let hls265EpisodesUpdated = 0;
+
   try {
     // Connect to database first
     await connectDB();
@@ -316,13 +337,15 @@ async function main() {
     const episodesWithMissingRawMediaIdInVisionularHls =
       await findActiveEpisodesWithMissingRawMediaId("visionularHls");
 
+    hlsEpisodesFound = episodesWithMissingRawMediaIdInVisionularHls.length;
+
     if (episodesWithMissingRawMediaIdInVisionularHls.length === 0) {
       console.log(
         "ℹ️  No episodes with missing raw media id in visionular hls to process."
       );
     } else {
       console.log(
-        `🎬 Found ${episodesWithMissingRawMediaIdInVisionularHls.length} episodes to process.`
+        `🎬 Found ${episodesWithMissingRawMediaIdInVisionularHls.length} HLS episodes to process.`
       );
 
       for (
@@ -333,7 +356,7 @@ async function main() {
         const episode = episodesWithMissingRawMediaIdInVisionularHls[i];
 
         console.log(
-          `\n📍 Processing episode ${i + 1}/${
+          `\n📍 Processing HLS episode ${i + 1}/${
             episodesWithMissingRawMediaIdInVisionularHls.length
           }`
         );
@@ -343,16 +366,21 @@ async function main() {
         try {
           const rawMedia = await createRawMediaFromEpisode(episode);
           console.log("rawMedia created successfully");
+          hlsRawMediaCreated++;
+
           await addRawMediaToEnAndHinEpisode({
             rawMediaId: rawMedia._id,
             slug: episode.slug,
             type: episode.type,
+            transcodingType: "visionularHls",
+            dialect: episode.language,
           });
           console.log("rawMedia added to episode successfully");
-          console.log(`✅ Episode ${i + 1} completed`);
+          hlsEpisodesUpdated++;
+          console.log(`✅ HLS Episode ${i + 1} completed`);
         } catch (error) {
           console.error(
-            `💥 Failed to process episode ${i + 1} (${episode.slug}):`,
+            `💥 Failed to process HLS episode ${i + 1} (${episode.slug}):`,
             error.message
           );
           // Continue with next episode instead of failing completely
@@ -367,13 +395,16 @@ async function main() {
     const episodesWithMissingRawMediaIdInvisionularHlsH265 =
       await findActiveEpisodesWithMissingRawMediaId("visionularHlsH265");
 
+    hls265EpisodesFound =
+      episodesWithMissingRawMediaIdInvisionularHlsH265.length;
+
     if (episodesWithMissingRawMediaIdInvisionularHlsH265.length === 0) {
       console.log(
         "ℹ️  No episodes with missing raw media id in visionular hls 265 to process."
       );
     } else {
       console.log(
-        `🎬 Found ${episodesWithMissingRawMediaIdInvisionularHlsH265.length} episodes to process.`
+        `🎬 Found ${episodesWithMissingRawMediaIdInvisionularHlsH265.length} HLS265 episodes to process.`
       );
 
       for (
@@ -396,17 +427,21 @@ async function main() {
           if (episode.visionularHls?.rawMediaId) {
             rawMediaId = episode.visionularHls.rawMediaId;
           } else {
-            rawMediaId = await createRawMediaFromEpisode(episode);
+            const rawMedia = await createRawMediaFromEpisode(episode);
+            rawMediaId = rawMedia._id;
+            hls265RawMediaCreated++;
           }
 
-          episode.visionularHlsH265 = {
-            ...episode.visionularHlsH265,
+          await addRawMediaToEnAndHinEpisode({
             rawMediaId: rawMediaId,
-          };
+            slug: episode.slug,
+            type: episode.type,
+            transcodingType: "visionularHlsH265",
+            dialect: episode.language,
+          });
+          hls265EpisodesUpdated++;
 
-          await episode.save();
-
-          console.log(`✅ Episode ${i + 1} updated`);
+          console.log(`✅ HLS265 Episode ${i + 1} updated`);
         } catch (error) {
           console.error(
             `💥 Failed to update HLS265 episode ${i + 1} (${episode.slug}):`,
@@ -419,6 +454,34 @@ async function main() {
 
     const totalTime = Date.now() - scriptStartTime;
     console.log("\n🎉 Processing completed successfully!");
+    console.log("=".repeat(60));
+    console.log("📊 FINAL SUMMARY:");
+    console.log("=".repeat(60));
+    console.log("📺 HLS (visionularHls) Statistics:");
+    console.log(`  📱 Episodes found: ${hlsEpisodesFound}`);
+    console.log(`  🏗️  Raw media created: ${hlsRawMediaCreated}`);
+    console.log(`  🔄 Episodes updated: ${hlsEpisodesUpdated}`);
+    console.log("");
+    console.log("📺 HLS265 (visionularHlsH265) Statistics:");
+    console.log(`  📱 Episodes found: ${hls265EpisodesFound}`);
+    console.log(`  🏗️  Raw media created: ${hls265RawMediaCreated}`);
+    console.log(`  🔄 Episodes updated: ${hls265EpisodesUpdated}`);
+    console.log("");
+    console.log("📊 TOTAL STATISTICS:");
+    console.log(
+      `  📱 Total episodes found: ${hlsEpisodesFound + hls265EpisodesFound}`
+    );
+    console.log(
+      `  🏗️  Total raw media created: ${
+        hlsRawMediaCreated + hls265RawMediaCreated
+      }`
+    );
+    console.log(
+      `  🔄 Total episodes updated: ${
+        hlsEpisodesUpdated + hls265EpisodesUpdated
+      }`
+    );
+    console.log("=".repeat(60));
     console.log(
       `⏱️  Total execution time: ${totalTime}ms (${Math.round(
         totalTime / 1000
