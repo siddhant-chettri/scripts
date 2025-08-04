@@ -101,18 +101,13 @@ const RawMediaSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    destination: {
-      type: DestinationSchema,
-      required: true,
-    },
+    destination_url: String,
     durationInSeconds: {
       type: Number,
       required: false,
     },
-    source: {
-      type: SourceSchema,
-      required: true,
-    },
+    source_type: String,
+    destination_url: String,
     status: {
       type: String,
       enum: Object.values(MediaStatusEnum),
@@ -123,7 +118,14 @@ const RawMediaSchema = new mongoose.Schema(
       default: [],
     },
     transcodingTask: {
-      type: [TranscodingTaskSchema],
+      type: [
+        {
+          taskStatus: String,
+          taskType: String,
+          transcodingEngine: String,
+          transcodingTaskId: mongoose.Schema.Types.ObjectId,
+        },
+      ],
       default: [],
     },
     uploadProgress: {
@@ -132,8 +134,7 @@ const RawMediaSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // Adds createdAt and updatedAt
-    collection: "rawmedia",
+    timestamps: true,
   }
 );
 

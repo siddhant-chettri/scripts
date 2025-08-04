@@ -4,10 +4,12 @@
   "description": "Database migration and utility scripts",
   "main": "script.js",
   "scripts": {
-    "start": "node script.js"
+    "start": "node script.js",
+    "db-sync": "node db-sync.js"
   },
   "dependencies": {
     "dotenv": "^17.2.1",
+    "mongodb": "^6.18.0",
     "mongoose": "^8.16.4"
   },
   "keywords": [],
