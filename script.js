@@ -150,7 +150,9 @@ async function createRawMediaFromEpisode(episode) {
   console.log(`📂 Source link: ${episode.sourceLink}`);
 
   // Get actual video duration using ffmpeg
-  const videoUrl = `${MEDIA_VIDEO_URL}/${episode.sourceLink}`;
+  const videoUrl = `${MEDIA_VIDEO_URL}/${
+    episode.type === "individual" ? "episode" : "show"
+  }/main-video/${episode.sourceLink}`;
   console.log(`🔗 Full video URL: ${videoUrl}`);
 
   let durationInSeconds;
